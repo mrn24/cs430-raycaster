@@ -51,7 +51,7 @@ int write_p3(char* input){
   fprintf(fp, "P3\n");
   fprintf(fp, "#This document was converted from json to P3 by my converter\n", image.format);
   fprintf(fp, "%d %d\n%d\n", image.width, image.height, image.range);
-  for(int i = 0; i<image.count; i++){
+  for(int i = 0; i<height*width; i++){
     fprintf(fp, "%d\n%d\n%d\n", image.buffer[i].r, image.buffer[i].g, image.buffer[i].b);
   }
   fclose(fp);
@@ -69,21 +69,21 @@ void fill_viewplane(){
 }
 
 int caster(){
-  viewplane = (double*)malloc(sizeof(double)*3*width*height);
   image.buffer = malloc(sizeof(RGBpixel)*width*height);
   image.height = height;
   image.width = width;
-  image.range = 250;
+  image.range = 255;
   double x_pos, y_pos, z_pos, x_dist, y_dist, z_dist, distance, a;
   double mag,t;
   double t_min=-1.0;
+  image.count = 0;
   int index = 0;
   int i, j, k;
   fill_viewplane();
   for (i=0;i<height;i++){
     for(j=0;j<width;j++){
-      x_pos = 0 - camerawidth/2+camerawidth/width*i+0.5;
-      y_pos = 0 - cameraheight/2+cameraheight/height*j+0.5;
+      x_pos = 0 - camerawidth/2+camerawidth/width*(j+0.5);
+      y_pos = 0 - cameraheight/2+cameraheight/height*(i+0.5);
       mag = sqrt(pow(x_pos, 2)+pow(y_pos, 2)+1);
       x_pos = x_pos/mag;
       y_pos = y_pos/mag;
@@ -101,9 +101,12 @@ int caster(){
 	    t = t-a;
 	    if(t_min == -1 || t<t_min){
 	      t_min = t;
-	      image.buffer[index].r=shapes[k].color[0];
-	      image.buffer[index].g=shapes[k].color[1];
-	      image.buffer[index].b=shapes[k].color[2];
+	      //Take the double value. Mult by max color value(255)
+	      //Cast to unsigned character. (u_char) number
+	      image.buffer[index].r=(u_char)(shapes[k].color[0]*image.range);
+	      image.buffer[index].g=(u_char)(shapes[k].color[1]*image.range);
+	      image.buffer[index].b=(u_char)(shapes[k].color[2]*image.range);
+	      image.count = image.count+1;
 	      index++;
 	    }
 	  }else{
@@ -338,12 +341,14 @@ void read_scene(char* filename) {
   }
 }
 
+
 int main(int c, char** argv) {
-  width = 100;
-  height = 100;
+  width = 10;
+  height = 10;
   read_scene(argv[1]);
-  // print_scene();
+  print_scene();
   caster();
-  write_p6("output.ppm");
+  write_p3("output.ppm");
   return 0;
 }
+

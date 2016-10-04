@@ -21,6 +21,15 @@ double camerawidth;
 
 int line = 1;
 
+
+int caster(){
+  int pixels[width*height];
+
+  for(int i=0;i<width;i++){
+    for(int j=0;j<height;j++){
+      
+
+
 void print_scene(count){
   printf("\nThe camera's width is %f, and the heigth is %f\n", camerawidth, cameraheight);
   for(int i=0;i<count;i++){

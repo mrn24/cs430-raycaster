@@ -58,13 +58,22 @@ int write_p3(char* input){
   return 0;
 }
 
+double quadratic(double a, double b, double c){
+   double t0 = (-b-sqrt((pow(b, 2))-4*a*c))/2*a;
+   double t1 = (-b+sqrt((pow(b, 2))-4*a*c))/2*a;
+
+   if(t0<0) return t1;
+   if(t0<t1) return t0;
+   return -1;
+}
+
 void fill_viewplane(){
   printf("Filling Viewplane\n");
   int i;
   for(i=0;i<width*height;i++){
-      image.buffer[i].r = 0;
-      image.buffer[i].g = 0;
-      image.buffer[i].b = 0;
+      image.buffer[i].r = 0.1;
+      image.buffer[i].g = 0.1;
+      image.buffer[i].b = 0.1;
   }
 }
 
@@ -73,8 +82,8 @@ int caster(){
   image.height = height;
   image.width = width;
   image.range = 255;
-  double x_pos, y_pos, z_pos, x_dist, y_dist, z_dist, distance, a;
-  double mag,t;
+  double x_pos, y_pos, z_pos, x_dist, y_dist, z_dist, distance, a, b, c, t0, t1;
+  double mag,t=0;
   double t_min=-1.0;
   image.count = 0;
   int index = 0;
@@ -82,6 +91,7 @@ int caster(){
   fill_viewplane();
   for (i=0;i<height;i++){
     for(j=0;j<width;j++){
+      t_min = -1;
       x_pos = 0 - camerawidth/2+camerawidth/width*(j+0.5);
       y_pos = 0 - cameraheight/2+cameraheight/height*(i+0.5);
       mag = sqrt(pow(x_pos, 2)+pow(y_pos, 2)+1);
@@ -90,34 +100,24 @@ int caster(){
       z_pos = 1/mag;
       for(k=0; k<oCount; k++){
 	// printf("width, height, objects %d %d %f\n", i, j, k);
-	if(shapes[k].type == 1){
-	  t=((x_pos*shapes[k].position[0])+(y_pos*shapes[k].position[1])+(z_pos*shapes[k].position[2]))/(x_pos+y_pos+z_pos);
-	  x_dist = x_pos*t;
-	  y_dist = x_pos*t;
-	  z_dist = z_pos*t;
-	  distance = sqrt(pow(x_dist - shapes[k].position[0], 2)+pow(y_dist - shapes[k].position[1], 2)+pow(z_dist - shapes[k].position[2], 2));
-	  if(distance <= shapes[k].radius){
-	    a = sqrt(pow(shapes[k].radius, 2) - pow(distance, 2));
-	    t = t-a;
-	    if(t_min == -1 || t<t_min){
-	      t_min = t;
-	      //Take the double value. Mult by max color value(255)
-	      //Cast to unsigned character. (u_char) number
-	      image.buffer[index].r=(u_char)(shapes[k].color[0]*image.range);
-	      image.buffer[index].g=(u_char)(shapes[k].color[1]*image.range);
-	      image.buffer[index].b=(u_char)(shapes[k].color[2]*image.range);
-	      image.count = image.count+1;
-	      index++;
-	    }
-	  }else{
-	    index++;
+	if(shapes[k].type == 1){	  
+	  a=pow(x_pos, 2)+pow(y_pos, 2)+pow(z_pos, 2);
+	  b=2 * (x_pos * (0-shapes[k].position[0]) + y_pos * (0-shapes[k].position[1]) + z_pos * (0-shapes[k].position[2]));
+	  c=(pow(0-shapes[k].position[0], 2) + pow(0-shapes[k].position[1], 2) + pow(0-shapes[k].position[2], 2)-pow(shapes[k].radius, 2));
+	  
+	  t=quadratic(a, b, c);
+	  
+	  if(t>0){
+	    t_min = t;
+	    //Take the double value. Mult by max color value(255)
+	    //Cast to unsigned character. (u_char) number
+	    image.buffer[i*width+j].r=(int)(shapes[k].color[0]*image.range);
+	    image.buffer[i*width+j].g=(int)(shapes[k].color[1]*image.range);
+	    image.buffer[i*width+j].b=(int)(shapes[k].color[2]*image.range);
 	  }
 	}
       }
     }
-  }
-  for(i=0;i<index;i++){
-    printf("[%d, %d, %d]\n", image.buffer[i].r, image.buffer[i].g, image.buffer[i].b);
   }
   return 0;
 }
@@ -313,8 +313,10 @@ void read_scene(char* filename) {
             shapes[oCount].color = next_vector(json);
 	  }else if (strcmp(key, "position") == 0){
 	    shapes[oCount].position = next_vector(json);
+	    shapes[oCount].position[1] = -1*shapes[oCount].position[1];
 	  }else if (strcmp(key, "normal") == 0){
 	    shapes[oCount].normal = next_vector(json);
+	    shapes[oCount].normal[1] = -1*shapes[oCount].normal[1];
 	  }else{
 	    fprintf(stderr, "Error: Unknown property, \"%s\", on line %d\n",
 		    key, line);
@@ -343,12 +345,11 @@ void read_scene(char* filename) {
 
 
 int main(int c, char** argv) {
-  width = 10;
-  height = 10;
+  width = 1000;
+  height = 1000;
   read_scene(argv[1]);
   print_scene();
   caster();
   write_p3("output.ppm");
   return 0;
 }
-

@@ -4,6 +4,21 @@
 
 #define DEBUG
 
+
+typedef struct {
+  int type;//1 - sphere, 2 - plane.
+  double *color;
+  double radius;
+  double *position;
+  double *normal;
+}Shape;
+
+typedef struct{
+  double height;
+  double width;
+  Shape *shapes;
+}Scene;
+
 int line = 1;
 
 // next_c() wraps the getc() function and provides error checking and line
@@ -104,6 +119,9 @@ double* next_vector(FILE* json) {
 
 void read_scene(char* filename) {
   int c;
+  Scene scene;
+  scene.shapes = malloc(sizeof(Scene*)*2);//Malloc!
+  int oCount = 0;
   FILE* json = fopen(filename, "r");
 
   if (json == NULL) {
@@ -119,11 +137,21 @@ void read_scene(char* filename) {
   skip_ws(json);
 
   // Find the objects
-
   while (1) {
     c = fgetc(json);
     if (c == ']') {
-      fprintf(stderr, "Error: This is the worst scene file EVER.\n");
+      printf("Were done, lets see if you suck!\n");
+      printf("The camera has a height %d, and a width %d\n",
+	     scene.width, scene.height);
+      for(int i = 0; i <= oCount; i++){
+	if(scene.shapes[i].type == 1){
+	  printf("The  object is a sphere with color %d, position %d, and radius %d\n",scene.shapes[i].color, scene.shapes[i].position, scene.shapes[i].radius);
+	}else if(scene.shapes[i].type==2){
+	   printf("The  object is a plane with color %d, position %d, and radiusnormal %d\n",scene.shapes[i].color, scene.shapes[i].position, scene.shapes[i].normal);
+	}else{
+	  printf("Yep, you suck!\n");
+	}
+      }
       fclose(json);
       return;
     }
@@ -147,7 +175,9 @@ void read_scene(char* filename) {
 
       if (strcmp(value, "camera") == 0) {
       } else if (strcmp(value, "sphere") == 0) {
+	scene.shapes[oCount].type = 1;
       } else if (strcmp(value, "plane") == 0) {
+	scene.shapes[oCount].type = 2;
       } else {
 	fprintf(stderr, "Error: Unknown type, \"%s\", on line number %d.\n", value, line);
 	exit(1);
@@ -160,28 +190,36 @@ void read_scene(char* filename) {
 	c = next_c(json);
 	if (c == '}') {
 	  // stop parsing this object
+	  oCount = oCount + 1;
 	  break;
 	} else if (c == ',') {
 	  // read another field
 	  skip_ws(json);
 	  char* key = next_string(json);
-	  printf("----%s---\n", key);
 	  skip_ws(json);
 	  expect_c(json, ':');
 	  skip_ws(json);
-	  if ((strcmp(key, "width") == 0) ||
-	      (strcmp(key, "height") == 0) ||
-	      (strcmp(key, "radius") == 0)) {
+	  if (strcmp(key, "width") == 0){
 	    double value = next_number(json);
-	    printf("It saw Width, height and Radius!\n---%d---\n", value);
-	  } else if ((strcmp(key, "color") == 0) ||
-		     (strcmp(key, "position") == 0) ||
-		     (strcmp(key, "normal") == 0)) {
+	    scene.width = value;
+	  }else if (strcmp(key, "height") == 0){
+	    double value = next_number(json);
+	    scene.height = value;
+	  }else if (strcmp(key, "radius") == 0){
+	    double value = next_number(json);
+	    scene.shapes[oCount].radius = value;
+	  }else if (strcmp(key, "color") == 0){
 	    double* value = next_vector(json);
-	  } else {
-	    fprintf(stderr, "Error: Unknown property, \"%s\", on line %d.\n",
+	    scene.shapes[oCount].color = value;
+	  }else if (strcmp(key, "position") == 0){
+	    double* value = next_vector(json);
+	    scene.shapes[oCount].position = value;
+	  }else if (strcmp(key, "normal") == 0){
+	    double* value = next_vector(json);
+	    scene.shapes[oCount].normal = value;
+	  }else{
+	    fprintf(stderr, "Error: Unknown property, \"%s\", on line %d\n",
 		    key, line);
-	    //char* value = next_string(json);
 	  }
 	  skip_ws(json);
 	} else {

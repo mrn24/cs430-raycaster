@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 
 typedef struct {
@@ -15,15 +16,79 @@ Shape shapes[180];
 
 int height;
 int width;
+int oCount=0;
 double cameraheight;
 double camerawidth;
-
+double* viewplane;
 
 int line = 1;
 
-void print_scene(count){
+void fill_viewplane(){
+  printf("Filling Viewplane\n");
+  int index = 0;
+  int i, j;
+  for(i=0;i<width;i++){
+    for(j=0;j<height;j++){
+      viewplane[index][0] = 0.1;
+      viewplane[index][1] = 0.1;
+      viewplane[index][2] = 0.1;
+      index++;
+    }
+  }
+}
+
+int caster(){
+  viewplane = (double*)malloc(sizeof(double)*3*width*height);
+  double x_pos, y_pos, z_pos, x_dist, y_dist, z_dist, distance, a;
+  double mag,t;
+  double t_min=-1.0;
+  int index = 0;
+  int i, j, k;
+  fill_viewplane();
+  for (i=0;i<width;i++){
+    for(j=0;j<height;j++){
+      x_pos = 0 - camerawidth/2+camerawidth/width*j+0.5;
+      y_pos = 0 - cameraheight/2+cameraheight/height*i+0.5;
+      mag = sqrt(pow(x_pos, 2)+pow(y_pos, 2)+1);
+      x_pos = x_pos/mag;
+      y_pos = y_pos/mag;
+      z_pos = 1/mag;
+      for(k=0; k<oCount; k++){
+	// printf("width, height, objects %d %d %f\n", i, j, k);
+	if(shapes[k].type = 1){
+	  t=((x_pos*shapes[k].position[0])+(y_pos*shapes[k].position[1])+(z_pos*shapes[k].position[2]))/(x_pos+y_pos+z_pos);
+	  x_dist = x_pos*t;
+	  y_dist = x_pos*t;
+	  z_dist = z_pos*t;
+	  distance = sqrt(pow(x_dist - shapes[k].position[0], 2)+pow(y_dist - shapes[k].position[1], 2)+pow(z_dist - shapes[k].position[2], 2));
+	  if(distance <= shapes[k].radius){
+	    a = sqrt(pow(shapes[k].radius, 2) - pow(distance, 2));
+	    t = t-a;
+	    if(t_min == -1 || t<t_min){
+	      t_min = t;
+	      viewplane[index++]=shapes[k].color[0];
+	      viewplane[index++]=shapes[k].color[1];
+	      viewplane[index++]=shapes[k].color[2];
+	    }
+	  }
+	}
+      }
+    }
+    index=index+3;
+  }
+  for(i=0;i<width;i++){
+    for(j=0;j<height;j++){
+      printf("%.1f\n", *(*(viewplane+i)+j));
+    }
+    printf("\n");
+  }
+  return 0;
+}
+
+
+void print_scene(){
   printf("\nThe camera's width is %f, and the heigth is %f\n", camerawidth, cameraheight);
-  for(int i=0;i<count;i++){
+  for(int i=0;i<oCount;i++){
     printf("Object: type %d\n", shapes[i].type);
     if(shapes[i].type == 1){
       printf("Radius: %f\n", shapes[i].radius);
@@ -136,7 +201,6 @@ double* next_vector(FILE* json) {
 
 void read_scene(char* filename) {
   int c;
-  int oCount = 0;
   FILE* json = fopen(filename, "r");
   if (json == NULL) {
     fprintf(stderr, "Error: Could not open file \"%s\"\n", filename);
@@ -154,7 +218,6 @@ void read_scene(char* filename) {
   while (1) {
     c = fgetc(json);
     if (c == ']') {
-      print_scene(oCount);
       fclose(json);
       return;
     }
@@ -204,10 +267,8 @@ void read_scene(char* filename) {
 	  expect_c(json, ':');
 	  skip_ws(json);
 	  if (strcmp(key, "width") == 0){
-	    printf("storing camera width");
 	    camerawidth = next_number(json);
 	  }else if (strcmp(key, "height") == 0){
-	    printf("Storing camera height");
 	    cameraheight = next_number(json);
 	  }else if (strcmp(key, "radius") == 0){
 	    shapes[oCount].radius = next_number(json);
@@ -244,6 +305,10 @@ void read_scene(char* filename) {
 }
 
 int main(int c, char** argv) {
+  width = 5;
+  height = 5;
   read_scene(argv[1]);
+  // print_scene();
+  caster();
   return 0;
 }

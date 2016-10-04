@@ -4,6 +4,15 @@
 #include <math.h>
 
 
+typedef struct RGBpixel {
+  unsigned char r, g, b;
+} RGBpixel;
+
+typedef struct Image{
+  int width, height, format, range, count;
+  RGBpixel *buffer;
+}Image;
+
 typedef struct {
   int type;//1 - sphere, 2 - plane.
   double* color;
@@ -13,6 +22,7 @@ typedef struct {
 }Shape;
 
 Shape shapes[180];
+Image image;
 
 int height;
 int width;
@@ -23,39 +33,64 @@ double* viewplane;
 
 int line = 1;
 
+int write_p6(char* input){
+  FILE* fp = fopen(input, "wb");
+  fprintf(fp, "P6\n");
+  fprintf(fp, "#This document was converted from json to P6 by my converter\n", image.format);
+  fprintf(fp, "%d %d\n%d\n", image.width, image.height, image.range);
+  fwrite(image.buffer, sizeof(RGBpixel), image.height * image.width, fp);
+  /*for(int i = 0; i<image.count; i++){
+    fwrite(fp, "%d%d%d", image.buffer[i].r, image.buffer[i].g, image.buffer[i].b);
+    }*/
+  fclose(fp);
+  return 0;
+}
+
+int write_p3(char* input){
+  FILE* fp = fopen(input, "w");
+  fprintf(fp, "P3\n");
+  fprintf(fp, "#This document was converted from json to P3 by my converter\n", image.format);
+  fprintf(fp, "%d %d\n%d\n", image.width, image.height, image.range);
+  for(int i = 0; i<image.count; i++){
+    fprintf(fp, "%d\n%d\n%d\n", image.buffer[i].r, image.buffer[i].g, image.buffer[i].b);
+  }
+  fclose(fp);
+  return 0;
+}
+
 void fill_viewplane(){
   printf("Filling Viewplane\n");
-  int index = 0;
-  int i, j;
-  for(i=0;i<width;i++){
-    for(j=0;j<height;j++){
-      viewplane[index][0] = 0.1;
-      viewplane[index][1] = 0.1;
-      viewplane[index][2] = 0.1;
-      index++;
-    }
+  int i;
+  for(i=0;i<width*height;i++){
+      image.buffer[i].r = 0;
+      image.buffer[i].g = 0;
+      image.buffer[i].b = 0;
   }
 }
 
 int caster(){
   viewplane = (double*)malloc(sizeof(double)*3*width*height);
+  image.buffer = malloc(sizeof(RGBpixel)*width*height);
+  image.height = height;
+  image.width = width;
+  image.range = 250;
   double x_pos, y_pos, z_pos, x_dist, y_dist, z_dist, distance, a;
   double mag,t;
   double t_min=-1.0;
   int index = 0;
   int i, j, k;
   fill_viewplane();
-  for (i=0;i<width;i++){
-    for(j=0;j<height;j++){
-      x_pos = 0 - camerawidth/2+camerawidth/width*j+0.5;
-      y_pos = 0 - cameraheight/2+cameraheight/height*i+0.5;
+  for (i=0;i<height;i++){
+    for(j=0;j<width;j++){
+      x_pos = 0 - camerawidth/2+camerawidth/width*i+0.5;
+      y_pos = 0 - cameraheight/2+cameraheight/height*j+0.5;
       mag = sqrt(pow(x_pos, 2)+pow(y_pos, 2)+1);
       x_pos = x_pos/mag;
       y_pos = y_pos/mag;
       z_pos = 1/mag;
       for(k=0; k<oCount; k++){
 	// printf("width, height, objects %d %d %f\n", i, j, k);
-	if(shapes[k].type = 1){
+	if(shapes[k].type == 1){
 	  t=((x_pos*shapes[k].position[0])+(y_pos*shapes[k].position[1])+(z_pos*shapes[k].position[2]))/(x_pos+y_pos+z_pos);
 	  x_dist = x_pos*t;
 	  y_dist = x_pos*t;
@@ -66,21 +101,20 @@ int caster(){
 	    t = t-a;
 	    if(t_min == -1 || t<t_min){
 	      t_min = t;
-	      viewplane[index++]=shapes[k].color[0];
-	      viewplane[index++]=shapes[k].color[1];
-	      viewplane[index++]=shapes[k].color[2];
+	      image.buffer[index].r=shapes[k].color[0];
+	      image.buffer[index].g=shapes[k].color[1];
+	      image.buffer[index].b=shapes[k].color[2];
+	      index++;
 	    }
+	  }else{
+	    index++;
 	  }
 	}
       }
     }
-    index=index+3;
   }
-  for(i=0;i<width;i++){
-    for(j=0;j<height;j++){
-      printf("%.1f\n", *(*(viewplane+i)+j));
-    }
-    printf("\n");
+  for(i=0;i<index;i++){
+    printf("[%d, %d, %d]\n", image.buffer[i].r, image.buffer[i].g, image.buffer[i].b);
   }
   return 0;
 }
@@ -305,10 +339,11 @@ void read_scene(char* filename) {
 }
 
 int main(int c, char** argv) {
-  width = 5;
-  height = 5;
+  width = 100;
+  height = 100;
   read_scene(argv[1]);
   // print_scene();
   caster();
+  write_p6("output.ppm");
   return 0;
 }

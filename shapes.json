@@ -19,7 +19,7 @@
     {
 	"type":"sphere",
 	 "color":[0,1.0,0],
-	"position":[0,2,10],
+	"position":[0,2,2],
 	"radius":.5
     },
     {

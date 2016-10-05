@@ -34,6 +34,7 @@ int line = 1;
 
 int write_p6(char* input){
   FILE* fp = fopen(input, "wb");
+  //create and print to a p6 file.
   fprintf(fp, "P6\n");
   fprintf(fp, "#This document was converted from json to P6 by my converter\n", image.format);
   fprintf(fp, "%d %d\n%d\n", image.width, image.height, image.range);
@@ -45,6 +46,7 @@ int write_p6(char* input){
   return 0;
 }
 
+//run the variables through the quadratic formula and checks the t values.
 double quadratic(double a, double b, double c){
    double t0 = (-b-sqrt((pow(b, 2))-4*a*c))/2*a;
    double t1 = (-b+sqrt((pow(b, 2))-4*a*c))/2*a;
@@ -54,6 +56,8 @@ double quadratic(double a, double b, double c){
    return -1;
 }
 
+//Plane intersection formula as well as setting up the variables.
+///returns the t value so long as the denominator isn't zero.
 double plane_intersection(double x_pos, double y_pos, double z_pos, int k){
   double a, b, c, d, mag, t;
 
@@ -72,15 +76,6 @@ double plane_intersection(double x_pos, double y_pos, double z_pos, int k){
   return t;
 }
 
-void fill_viewplane(){
-  printf("Filling Viewplane\n");
-  int i;
-  for(i=0;i<width*height;i++){
-      image.buffer[i].r = 0.1;
-      image.buffer[i].g = 0.1;
-      image.buffer[i].b = 0.1;
-  }
-}
 
 int caster(){
   //Instantiate the image object, and the buffer inside of it.
@@ -100,17 +95,21 @@ int caster(){
       //Pixel center
       x_pos = 0 - camerawidth/2+camerawidth/width*(j+0.5);
       y_pos = 0 - cameraheight/2+cameraheight/height*(i+0.5);
+      //Normalize direction vector
       mag = sqrt(pow(x_pos, 2)+pow(y_pos, 2)+1);
       x_pos = x_pos/mag;
       y_pos = y_pos/mag;
       z_pos = 1/mag;
+      //Loop through all objects
       for(k=0; k<oCount; k++){
-	// printf("width, height, objects %d %d %f\n", i, j, k);
+	//If its a sphere, sphere intersection formula
 	if(shapes[k].type == 1){	  
 	  a=pow(x_pos, 2)+pow(y_pos, 2)+pow(z_pos, 2);
 	  b=2 * (x_pos * (0-shapes[k].position[0]) + y_pos * (0-shapes[k].position[1]) + z_pos * (0-shapes[k].position[2]));
 	  c=(pow(0-shapes[k].position[0], 2) + pow(0-shapes[k].position[1], 2) + pow(0-shapes[k].position[2], 2)-pow(shapes[k].radius, 2));
+	  //Get some help with quadratic functions
 	  t=quadratic(a, b, c);
+	  //If t is positive and closer than t_min, lets paint.
 	  if(t>0){
 	    if(t_min == -1 || t<t_min){
 	      t_min = t;
@@ -121,9 +120,11 @@ int caster(){
 	      image.buffer[i*width+j].b=(int)(shapes[k].color[2]*image.range);
 	    }
 	  }
+	  //If its a plane..
 	}else if(shapes[k].type == 2){
-	 
+	  //Send pertinent to helper function and get the t-value
 	  t = plane_intersection(x_pos, y_pos, z_pos, k);
+	  //If t is positive and closer than t_min, lets paint.
 	  if(t>0){
 	    if(t_min == -1 || t<t_min){
 	      t_min = t;
@@ -134,6 +135,8 @@ int caster(){
 	      image.buffer[i*width+j].b=(int)(shapes[k].color[2]*image.range);
 	    }
 	  }
+	}else{
+	  fprintf(stderr, "I'm not sure what shape that is!");
 	}
       }
     }

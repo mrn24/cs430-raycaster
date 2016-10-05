@@ -9,7 +9,7 @@ typedef struct RGBpixel {
 } RGBpixel;
 
 typedef struct Image{
-  int width, height, format, range, count;
+  int width, height, format, range;
   RGBpixel *buffer;
 }Image;
 
@@ -29,12 +29,12 @@ int width;
 int oCount=0;
 double cameraheight;
 double camerawidth;
-double* viewplane;
 
 int line = 1;
 
 int write_p6(char* input){
   FILE* fp = fopen(input, "wb");
+  //create and print to a p6 file.
   fprintf(fp, "P6\n");
   fprintf(fp, "#This document was converted from json to P6 by my converter\n", image.format);
   fprintf(fp, "%d %d\n%d\n", image.width, image.height, image.range);
@@ -46,18 +46,7 @@ int write_p6(char* input){
   return 0;
 }
 
-int write_p3(char* input){
-  FILE* fp = fopen(input, "w");
-  fprintf(fp, "P3\n");
-  fprintf(fp, "#This document was converted from json to P3 by my converter\n", image.format);
-  fprintf(fp, "%d %d\n%d\n", image.width, image.height, image.range);
-  for(int i = 0; i<height*width; i++){
-    fprintf(fp, "%d\n%d\n%d\n", image.buffer[i].r, image.buffer[i].g, image.buffer[i].b);
-  }
-  fclose(fp);
-  return 0;
-}
-
+//run the variables through the quadratic formula and checks the t values.
 double quadratic(double a, double b, double c){
    double t0 = (-b-sqrt((pow(b, 2))-4*a*c))/2*a;
    double t1 = (-b+sqrt((pow(b, 2))-4*a*c))/2*a;
@@ -67,77 +56,92 @@ double quadratic(double a, double b, double c){
    return -1;
 }
 
-void fill_viewplane(){
-  printf("Filling Viewplane\n");
-  int i;
-  for(i=0;i<width*height;i++){
-      image.buffer[i].r = 0.1;
-      image.buffer[i].g = 0.1;
-      image.buffer[i].b = 0.1;
-  }
+//Plane intersection formula as well as setting up the variables.
+///returns the t value so long as the denominator isn't zero.
+double plane_intersection(double x_pos, double y_pos, double z_pos, int k){
+  double a, b, c, d, mag, t;
+
+  a = shapes[k].normal[0];
+  b = shapes[k].normal[1];
+  c = shapes[k].normal[2];
+  mag = sqrt(pow(a, 2)+pow(b, 2)+pow(c, 2));
+  a = a/mag;
+  b = b/mag;
+  c = c/mag;
+  d = -(a*shapes[k].position[0] + b*shapes[k].position[1] + c*shapes[k].position[2]);
+  if(a*x_pos + b*y_pos + c*z_pos == 0){
+    return -1;
+  }	    
+  t = -d/(a*x_pos + b*y_pos + c*z_pos);
+  return t;
 }
 
+
 int caster(){
+  //Instantiate the image object, and the buffer inside of it.
   image.buffer = malloc(sizeof(RGBpixel)*width*height);
   image.height = height;
   image.width = width;
   image.range = 255;
-  double x_pos, y_pos, z_pos, x_dist, y_dist, z_dist, distance, a, b, c, t0, t1;
+  //All of the math variables
+  double x_pos, y_pos, z_pos, x_dist, y_dist, z_dist, distance, a, b, c, d, t0, t1;
   double mag,t=0;
   double t_min=-1.0;
-  image.count = 0;
-  int index = 0;
   int i, j, k;
-  fill_viewplane();
+  //Nested for loop to iterate through all the pixels
   for (i=0;i<height;i++){
     for(j=0;j<width;j++){
       t_min = -1;
+      //Pixel center
       x_pos = 0 - camerawidth/2+camerawidth/width*(j+0.5);
       y_pos = 0 - cameraheight/2+cameraheight/height*(i+0.5);
+      //Normalize direction vector
       mag = sqrt(pow(x_pos, 2)+pow(y_pos, 2)+1);
       x_pos = x_pos/mag;
       y_pos = y_pos/mag;
       z_pos = 1/mag;
+      //Loop through all objects
       for(k=0; k<oCount; k++){
-	// printf("width, height, objects %d %d %f\n", i, j, k);
+	//If its a sphere, sphere intersection formula
 	if(shapes[k].type == 1){	  
 	  a=pow(x_pos, 2)+pow(y_pos, 2)+pow(z_pos, 2);
 	  b=2 * (x_pos * (0-shapes[k].position[0]) + y_pos * (0-shapes[k].position[1]) + z_pos * (0-shapes[k].position[2]));
 	  c=(pow(0-shapes[k].position[0], 2) + pow(0-shapes[k].position[1], 2) + pow(0-shapes[k].position[2], 2)-pow(shapes[k].radius, 2));
-	  
+	  //Get some help with quadratic functions
 	  t=quadratic(a, b, c);
-	  
+	  //If t is positive and closer than t_min, lets paint.
 	  if(t>0){
-	    t_min = t;
-	    //Take the double value. Mult by max color value(255)
-	    //Cast to unsigned character. (u_char) number
-	    image.buffer[i*width+j].r=(int)(shapes[k].color[0]*image.range);
-	    image.buffer[i*width+j].g=(int)(shapes[k].color[1]*image.range);
-	    image.buffer[i*width+j].b=(int)(shapes[k].color[2]*image.range);
+	    if(t_min == -1 || t<t_min){
+	      t_min = t;
+	      //Take the double value. Mult by max color value(255)
+	      //Cast to unsigned character. (u_char) number
+	      image.buffer[i*width+j].r=(int)(shapes[k].color[0]*image.range);
+	      image.buffer[i*width+j].g=(int)(shapes[k].color[1]*image.range);
+	      image.buffer[i*width+j].b=(int)(shapes[k].color[2]*image.range);
+	    }
 	  }
+	  //If its a plane..
+	}else if(shapes[k].type == 2){
+	  //Send pertinent to helper function and get the t-value
+	  t = plane_intersection(x_pos, y_pos, z_pos, k);
+	  //If t is positive and closer than t_min, lets paint.
+	  if(t>0){
+	    if(t_min == -1 || t<t_min){
+	      t_min = t;
+	      //Take the double value. Mult by max color value(255)
+	      //Cast to unsigned character. (u_char) number
+	      image.buffer[i*width+j].r=(int)(shapes[k].color[0]*image.range);
+	      image.buffer[i*width+j].g=(int)(shapes[k].color[1]*image.range);
+	      image.buffer[i*width+j].b=(int)(shapes[k].color[2]*image.range);
+	    }
+	  }
+	}else{
+	  fprintf(stderr, "I'm not sure what shape that is!");
 	}
       }
     }
   }
   return 0;
-}
-
-
-void print_scene(){
-  printf("\nThe camera's width is %f, and the heigth is %f\n", camerawidth, cameraheight);
-  for(int i=0;i<oCount;i++){
-    printf("Object: type %d\n", shapes[i].type);
-    if(shapes[i].type == 1){
-      printf("Radius: %f\n", shapes[i].radius);
-    }
-    for(int j=0;j<3;j++){
-      printf("Color: %f\n", shapes[i].color[j]);
-      printf("Position: %f\n", shapes[i].position[j]);
-      if(shapes[i].type == 2){
-	printf("Normal: %f\n", shapes[i].normal[j]);
-      }
-    }
-  }
 }
 
 // next_c() wraps the getc() function and provides error checking and line
@@ -276,7 +280,7 @@ void read_scene(char* filename) {
       
       char* value = next_string(json);
       
-      if (strcmp(value, "camera") == 0) {
+      if (strcmp(value, "camera") == 0) {   //Set type, decrease object count for camera
 	oCount = oCount - 1;
       } else if (strcmp(value, "sphere") == 0) {
 	shapes[oCount].type = 1;
@@ -303,7 +307,7 @@ void read_scene(char* filename) {
 	  skip_ws(json);
 	  expect_c(json, ':');
 	  skip_ws(json);
-	  if (strcmp(key, "width") == 0){
+	  if (strcmp(key, "width") == 0){//store appropriate value into the shapes struct.
 	    camerawidth = next_number(json);
 	  }else if (strcmp(key, "height") == 0){
 	    cameraheight = next_number(json);
@@ -311,7 +315,7 @@ void read_scene(char* filename) {
 	    shapes[oCount].radius = next_number(json);
 	  }else if (strcmp(key, "color") == 0){
             shapes[oCount].color = next_vector(json);
-	  }else if (strcmp(key, "position") == 0){
+	  }else if (strcmp(key, "position") == 0){ //For position and normal, flip the y coordinate so that positive Y means up.
 	    shapes[oCount].position = next_vector(json);
 	    shapes[oCount].position[1] = -1*shapes[oCount].position[1];
 	  }else if (strcmp(key, "normal") == 0){
@@ -344,12 +348,16 @@ void read_scene(char* filename) {
 }
 
 
-int main(int c, char** argv) {
-  width = 1000;
-  height = 1000;
-  read_scene(argv[1]);
-  print_scene();
+int main(int argc, char** argv) {
+
+  if(argc != 5){
+    fprintf(stderr, "Not the correct arguments: please add <width> <height> <input(.json)> <output file name(.ppm)>");
+    exit(1);
+  }
+  width = atoi(argv[1]);
+  height = atoi(argv[2]);
+  read_scene(argv[3]);
   caster();
-  write_p3("output.ppm");
+  write_p6(argv[4]);
   return 0;
 }

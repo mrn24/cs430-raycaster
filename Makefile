@@ -1,5 +1,5 @@
-all: parser.c
-	gcc parser.c -o raycast -lm
+all: raycast.c
+	gcc raycast.c -o raycast -lm
 
 clean:
 	rm -rf raycast *~
